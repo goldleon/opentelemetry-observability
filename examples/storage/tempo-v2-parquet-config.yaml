@@ -1,0 +1,73 @@
+# ========================================================================
+# Grafana Tempo v2 Production Configuration
+# Columnar Parquet Block Storage with Streaming TraceQL
+# ========================================================================
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 30m
+  max_block_bytes: 1073741824 # 1GB
+  complete_block_timeout: 15m
+  trace_idle_time: 10s
+
+compactor:
+  compaction:
+    block_retention: 336h # 14 days
+    compacted_block_retention: 1h
+    max_compaction_objects: 10000
+    max_block_bytes: 10737418240 # 10GB compacted blocks
+
+storage:
+  trace:
+    backend: s3
+    # Use modern columnar v2 Parquet engine
+    version: v2
+    s3:
+      bucket: enterprise-tempo-traces-parquet
+      endpoint: s3.us-east-1.amazonaws.com
+      insecure: false
+    pool:
+      max_workers: 400
+      queue_depth: 20000
+    wal:
+      path: /var/tempo/wal
+    block:
+      # Bloom filter indexing on span tags for instant TraceQL filtering
+      bloom_filter:
+        false_positive_rate: 0.01
+        cardinality_limit: 100000
+      encoding: zstd
+
+# TraceQL Query Engine Optimization
+querier:
+  max_concurrent_queries: 20
+  search:
+    external_endpoints: 10
+    prefer_self: 10
+    query_timeout: 30s
+  streaming:
+    enabled: true
+    chunk_size: 500
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics
+      storage:
+        remote_write:
+          - url: http://mimir-distributor.monitoring.svc.cluster.local:8080/api/v1/push
+            send_exemplars: true

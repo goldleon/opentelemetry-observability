@@ -1,0 +1,90 @@
+# ========================================================================
+# Grafana Mimir Production Configuration
+# Scalable Multi-Tenant TSDB on Object Storage (S3 / GCS)
+# ========================================================================
+
+target: all
+multitenancy_enabled: true
+
+server:
+  http_listen_port: 8080
+  grpc_listen_port: 9095
+  grpc_server_max_recv_msg_size: 104857600
+  grpc_server_max_send_msg_size: 104857600
+
+activity_tracker:
+  filepath: /var/mimir/activity.log
+
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+  pool:
+    health_check_ingesters: true
+
+ingester:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+    replication_factor: 3
+  # Retain in memory before flushing 2h blocks to object storage
+  max_chunk_age: 2h
+  chunk_idle_period: 30m
+  chunk_target_size: 1572864 # 1.5MB per chunk
+
+ingester_client:
+  grpc_client_config:
+    max_recv_msg_size: 104857600
+    max_send_msg_size: 104857600
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 3
+    kvstore:
+      store: memberlist
+
+compactor:
+  data_dir: /var/mimir/compactor
+  compaction_interval: 1h
+  deletion_delay: 2h
+  first_level_compaction_wait_period: 2h
+  max_closing_blocks_concurrency: 2
+  max_opening_blocks_concurrency: 4
+  symbols_flush_interval: 10m
+  # Roll up 2h blocks into 12h, and 12h into 24h
+  block_ranges:
+    - 2h
+    - 12h
+    - 24h
+
+blocks_storage:
+  backend: s3
+  s3:
+    endpoint: s3.us-east-1.amazonaws.com
+    bucket_name: enterprise-mimir-tsdb-metrics
+    insecure: false
+  tsdb:
+    dir: /var/mimir/tsdb
+    block_ranges_period: [2h]
+    retention_period: 90d
+    ship_concurrency: 10
+    head_compaction_interval: 1m
+    # Native support for OpenTelemetry exemplars
+    enable_exemplar: true
+    max_exemplars: 100000
+
+limits:
+  max_global_series_per_user: 5000000
+  max_global_series_per_metric: 500000
+  ingestion_rate: 100000
+  ingestion_burst_size: 200000
+  # Postings cache in memory to speed up regex label searches
+  compactor_blocks_retention_period: 90d
+
+memberlist:
+  node_name: mimir-0
+  bind_port: 7946
+  join_members:
+    - mimir-gossip.monitoring.svc.cluster.local:7946

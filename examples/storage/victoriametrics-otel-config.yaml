@@ -1,0 +1,42 @@
+# ========================================================================
+# VictoriaMetrics Production Cluster Configuration for OpenTelemetry
+# High-throughput ingestion of OTLP/Prometheus metrics with downsampling
+# ========================================================================
+
+# vminsert (Ingestion Tier)
+vminsert:
+  listen: ":8480"
+  storage_nodes:
+    - "vmstorage-0.vmstorage.monitoring.svc.cluster.local:8400"
+    - "vmstorage-1.vmstorage.monitoring.svc.cluster.local:8400"
+    - "vmstorage-2.vmstorage.monitoring.svc.cluster.local:8400"
+  replication_factor: 2
+  # Accepts OTLP gRPC (:4317) and OTLP HTTP (:4318) directly or via Prometheus remote_write
+  drop_samples_on_overload: false
+
+# vmstorage (Stateful Storage Tier)
+vmstorage:
+  retention_period: "90d"
+  storage_data_path: "/var/lib/victoria-metrics-data"
+  # Automatic deduplication for high-availability scrapers
+  dedup:
+    min_scrape_interval: "15s"
+  # Downsampling rules to save object storage costs over time
+  downsampling:
+    - "30d:5m"   # After 30 days, downsample to 5-minute intervals
+    - "90d:1h"   # After 90 days, downsample to 1-hour intervals
+  cache_size:
+    index_db: "4GiB"
+    data_blocks: "8GiB"
+
+# vmselect (Query Tier)
+vmselect:
+  listen: ":8481"
+  storage_nodes:
+    - "vmstorage-0.vmstorage.monitoring.svc.cluster.local:8401"
+    - "vmstorage-1.vmstorage.monitoring.svc.cluster.local:8401"
+    - "vmstorage-2.vmstorage.monitoring.svc.cluster.local:8401"
+  search:
+    max_points_per_timeseries: 30000
+    max_query_duration: "30s"
+    latency_offset: "10s"
