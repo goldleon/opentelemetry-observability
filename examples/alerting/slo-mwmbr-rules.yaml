@@ -1,0 +1,104 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: otel-service-slo-alerts
+  namespace: monitoring
+spec:
+  groups:
+  - name: slo-recording-rules
+    rules:
+    - record: job:service_error_rate:ratio_rate5m
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[5m]))
+
+    - record: job:service_error_rate:ratio_rate30m
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[30m]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[30m]))
+
+    - record: job:service_error_rate:ratio_rate1h
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[1h]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[1h]))
+
+    - record: job:service_error_rate:ratio_rate2h
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[2h]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[2h]))
+
+    - record: job:service_error_rate:ratio_rate6h
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[6h]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[6h]))
+
+    - record: job:service_error_rate:ratio_rate1d
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[1d]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[1d]))
+
+    - record: job:service_error_rate:ratio_rate3d
+      expr: |
+        sum by (service_name) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[3d]))
+        /
+        sum by (service_name) (rate(traces_spanmetrics_calls_total[3d]))
+
+  - name: slo-mwmbr-alerts
+    rules:
+    - alert: ErrorBudgetBurnRate14_4x
+      expr: |
+        job:service_error_rate:ratio_rate1h > (14.4 * 0.001)
+        and
+        job:service_error_rate:ratio_rate5m > (14.4 * 0.001)
+      for: 2m
+      labels:
+        severity: critical
+        slo_tier: tier-1
+      annotations:
+        summary: "High error budget burn rate (14.4x) on service {{ $labels.service_name }}"
+        description: "Service {{ $labels.service_name }} is burning 2% of its error budget in 1 hour."
+
+    - alert: ErrorBudgetBurnRate6x
+      expr: |
+        job:service_error_rate:ratio_rate6h > (6.0 * 0.001)
+        and
+        job:service_error_rate:ratio_rate30m > (6.0 * 0.001)
+      for: 5m
+      labels:
+        severity: critical
+        slo_tier: tier-1
+      annotations:
+        summary: "Elevated error budget burn rate (6x) on service {{ $labels.service_name }}"
+        description: "Service {{ $labels.service_name }} is burning 5% of its error budget in 6 hours."
+
+    - alert: ErrorBudgetBurnRate3x
+      expr: |
+        job:service_error_rate:ratio_rate1d > (3.0 * 0.001)
+        and
+        job:service_error_rate:ratio_rate2h > (3.0 * 0.001)
+      for: 15m
+      labels:
+        severity: warning
+        slo_tier: tier-1
+      annotations:
+        summary: "Moderate error budget burn rate (3x) on service {{ $labels.service_name }}"
+        description: "Service {{ $labels.service_name }} is burning 10% of its error budget over 24 hours."
+
+    - alert: ErrorBudgetBurnRate1x
+      expr: |
+        job:service_error_rate:ratio_rate3d > (1.0 * 0.001)
+        and
+        job:service_error_rate:ratio_rate6h > (1.0 * 0.001)
+      for: 30m
+      labels:
+        severity: warning
+        slo_tier: tier-1
+      annotations:
+        summary: "Slow continuous error budget burn rate (1x) on service {{ $labels.service_name }}"
+        description: "Service {{ $labels.service_name }} will exhaust its monthly error budget if current 3-day rate continues."

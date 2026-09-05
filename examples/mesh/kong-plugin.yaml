@@ -1,0 +1,17 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: global-opentelemetry
+  namespace: kong
+plugin: opentelemetry
+config:
+  endpoint: http://otel-collector.monitoring.svc.cluster.local:4318/v1/traces
+  batch_span_processor: true
+  batch_flush_delay: 2
+  max_queue_size: 2048
+  headers:
+    x-client-origin: "kong-gateway"
+  resource_attributes:
+    service.name: "kong-ingress"
+    service.version: "3.4"
+  header_type: "w3c"

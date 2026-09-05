@@ -1,0 +1,23 @@
+name: Production Release Pipeline
+on:
+  push:
+    branches: [main]
+
+env:
+  OTEL_EXPORTER_OTLP_ENDPOINT: "https://telemetry-gateway.example.com:4317"
+  OTEL_EXPORTER_OTLP_HEADERS: "x-api-key=${{ secrets.OTEL_PIPELINE_TOKEN }}"
+  OTEL_SERVICE_NAME: "github-actions-runner"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Compile and Run Unit Tests
+        env:
+          TRACEPARENT: ${{ steps.step1.outputs.traceparent }}
+        run: |
+          npm ci
+          npm run test:ci

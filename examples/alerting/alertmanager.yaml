@@ -1,0 +1,35 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'service_name', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'slack-observability'
+  routes:
+  - match:
+      severity: critical
+    receiver: 'pagerduty-oncall'
+    continue: true
+  - match:
+      severity: warning
+    receiver: 'jira-tickets'
+
+receivers:
+- name: 'pagerduty-oncall'
+  pagerduty_configs:
+  - service_key: "${PAGERDUTY_KEY}"
+    severity: 'critical'
+    description: '{{ .CommonAnnotations.summary }}: {{ .CommonAnnotations.description }}'
+
+- name: 'slack-observability'
+  slack_configs:
+  - channel: '#alerts-slo-ops'
+    api_url: "${SLACK_WEBHOOK_URL}"
+    send_resolved: true
+
+- name: 'jira-tickets'
+  webhook_configs:
+  - url: 'https://jira-bridge.monitoring.svc.cluster.local/api/v1/issue'
+    send_resolved: false

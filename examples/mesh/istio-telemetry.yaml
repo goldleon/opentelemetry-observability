@@ -1,0 +1,18 @@
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-wide-telemetry
+  namespace: istio-system
+spec:
+  tracing:
+  - providers:
+    - name: otel-tracing
+    randomSamplingPercentage: 100.0
+    customTags:
+      session_id:
+        header:
+          name: "x-session-id"
+          defaultValue: "anonymous"
+      cluster_id:
+        literal:
+          value: "us-east-1-prod-k8s"
