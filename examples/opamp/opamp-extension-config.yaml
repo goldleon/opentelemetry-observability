@@ -1,0 +1,11 @@
+extensions:
+  opamp:
+    server:
+      ws:
+        endpoint: "wss://opamp.monitoring.svc.cluster.local:443/v1/opamp"
+        tls:
+          insecure: false
+          ca_file: "/etc/ssl/certs/opamp-ca.crt"
+    capabilities:
+      reports_status: true
+      reports_effective_config: true

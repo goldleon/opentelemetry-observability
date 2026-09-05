@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: otel-gateway
+  namespace: monitoring
+spec:
+  serviceName: otel-gateway-headless
+  replicas: 4
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otel-gateway
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: otelcol
+          image: ghcr.io/enterprise/otelcol-custom:1.4.0
+          env:
+            - name: GOMEMLIMIT
+              value: "3600MiB"
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2048Mi
+            limits:
+              cpu: 4000m
+              memory: 4096Mi
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 8888
+              name: metrics
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol
+            - name: storage
+              mountPath: /var/lib/otelcol/file_storage
+      volumes:
+        - name: config
+          configMap:
+            name: otel-gateway-config
+  volumeClaimTemplates:
+    - metadata:
+        name: storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: otel-gateway-hpa
+  namespace: monitoring
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: otel-gateway
+  minReplicas: 4
+  maxReplicas: 16
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75

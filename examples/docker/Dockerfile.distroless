@@ -1,0 +1,27 @@
+# Stage 1: Build binary using official OCB
+FROM golang:1.24-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates make gcc musl-dev
+
+ARG OCB_VERSION=0.118.0
+RUN go install go.opentelemetry.io/collector/cmd/builder@v${OCB_VERSION}
+
+WORKDIR /src
+COPY ocb-builder-config.yaml builder-config.yaml
+RUN CGO_ENABLED=0 builder --config=builder-config.yaml
+
+# Stage 2: Minimal Distroless Runtime
+FROM gcr.io/distroless/static-debian12:nonroot
+
+LABEL maintainer="Observability Team <observability@enterprise.internal>"
+LABEL org.opencontainers.image.source="https://github.com/enterprise/custom-otelcol"
+
+WORKDIR /
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /build/dist/otelcol-custom /otelcol-custom
+
+USER 65532:65532
+EXPOSE 4317 4318 8888 13133
+
+ENTRYPOINT ["/otelcol-custom"]
+CMD ["--config=/etc/otelcol/config.yaml"]

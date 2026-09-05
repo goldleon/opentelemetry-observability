@@ -1,0 +1,48 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: cluster-gateway
+  namespace: monitoring
+spec:
+  mode: statefulset
+  replicas: 4
+  image: ghcr.io/enterprise/otelcol-custom:1.4.0
+  resources:
+    limits:
+      cpu: "4"
+      memory: 4Gi
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: file-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 20Gi
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    processors:
+      memory_limiter:
+        check_interval: 250ms
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      batch:
+        send_batch_size: 8192
+        timeout: 1s
+    exporters:
+      otlp/tempo:
+        endpoint: tempo.monitoring.svc.cluster.local:4317
+        tls: { insecure: true }
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/tempo]

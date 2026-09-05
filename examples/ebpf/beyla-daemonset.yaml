@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: beyla
+  namespace: monitoring
+  labels:
+    app: beyla
+spec:
+  selector:
+    matchLabels:
+      app: beyla
+  template:
+    metadata:
+      labels:
+        app: beyla
+    spec:
+      hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: beyla
+          image: grafana/beyla:1.8.0
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["BPF", "PERFMON", "NET_ADMIN", "SYS_PTRACE"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/beyla
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+              readOnly: true
+            - name: sys-fs-bpf
+              mountPath: /sys/fs/bpf
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: beyla-config
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+        - name: sys-fs-bpf
+          hostPath:
+            path: /sys/fs/bpf
+        - name: proc
+          hostPath:
+            path: /proc

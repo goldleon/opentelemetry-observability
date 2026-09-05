@@ -1,0 +1,108 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  file_storage/traces:
+    directory: /var/lib/otelcol/file_storage/traces
+    timeout: 1s
+    max_mb: 10240
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        keepalive:
+          server_parameters:
+            max_connection_age: 120s
+            max_connection_age_grace: 30s
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 250ms
+    limit_percentage: 75
+    spike_limit_percentage: 15
+
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 100000
+    expected_new_traces_per_sec: 5000
+    decision_cache:
+      sampled_cache_size: 50000
+      non_sampled_cache_size: 50000
+    policies:
+      - name: errors-policy
+        type: status_code
+        status_code: { status_codes: [ ERROR ] }
+      - name: http-5xx-policy
+        type: numeric_attribute
+        numeric_attribute:
+          key: http.response.status_code
+          min_value: 500
+          max_value: 599
+      - name: latency-policy
+        type: latency
+        latency: { threshold_ms: 1500 }
+      - name: probabilistic-fallback
+        type: probabilistic
+        probabilistic: { sampling_percentage: 2.0 }
+
+  transform/scrub_pii:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - replace_all_patterns(attributes, "value", "token=[^&]+", "token=REDACTED")
+          - drop() where attributes["http.route"] == "/healthz"
+
+  batch:
+    send_batch_size: 8192
+    timeout: 1s
+    send_batch_max_size: 16384
+
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s]
+    dimensions:
+      - name: http.response.status_code
+      - name: http.request.method
+      - name: service.version
+    aggregation_temporality: "CUMULATIVE"
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo-distributor.monitoring.svc.cluster.local:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 16
+      queue_size: 50000
+      storage: file_storage/traces
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 15m
+
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: otel
+
+service:
+  extensions: [health_check, file_storage/traces]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, transform/scrub_pii, batch]
+      exporters: [spanmetrics, otlp/tempo]
+    metrics/from_traces:
+      receivers: [spanmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888

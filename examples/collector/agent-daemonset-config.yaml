@@ -1,0 +1,80 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+  filelog:
+    include: [/var/log/pods/*/*/*.log]
+    exclude: [/var/log/pods/monitoring_*/*/*.log]
+    start_at: end
+    include_file_path: true
+    include_file_name: false
+    operators:
+      - type: container
+        id: container-parser
+
+processors:
+  memory_limiter:
+    check_interval: 200ms
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  k8sattributes:
+    auth_type: "serviceAccount"
+    passthrough: false
+    filter:
+      node_from_env_var: HOST_NAME
+    extract:
+      metadata:
+        - k8s.pod.name
+        - k8s.pod.uid
+        - k8s.deployment.name
+        - k8s.namespace.name
+        - k8s.node.name
+        - k8s.container.name
+
+  batch:
+    send_batch_size: 4096
+    timeout: 500ms
+
+exporters:
+  loadbalancing:
+    protocol:
+      otlp:
+        timeout: 2s
+        tls:
+          insecure: true
+    resolver:
+      dns:
+        hostname: otel-gateway-headless.monitoring.svc.cluster.local
+        port: 4317
+    routing_key: "trace_id"
+
+  otlp/gateway_metrics_logs:
+    endpoint: otel-gateway.monitoring.svc.cluster.local:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, batch]
+      exporters: [loadbalancing]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, k8sattributes, batch]
+      exporters: [otlp/gateway_metrics_logs]
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, k8sattributes, batch]
+      exporters: [otlp/gateway_metrics_logs]

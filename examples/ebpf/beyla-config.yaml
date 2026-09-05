@@ -1,0 +1,43 @@
+open_telemetry:
+  traces:
+    endpoint: "otel-agent.monitoring.svc.cluster.local:4317"
+    protocol: grpc
+    insecure: true
+    sampler:
+      name: parentbased_traceidratio
+      arg: "0.20"
+  metrics:
+    endpoint: "otel-agent.monitoring.svc.cluster.local:4317"
+    protocol: grpc
+    insecure: true
+    interval: 10s
+    features:
+      - application
+      - network
+
+filter:
+  network:
+    k8s:
+      exclude:
+        - namespace: "(kube-system|cert-manager|monitoring)"
+  http:
+    exclude:
+      - url: ".*(healthz|livez|readyz|metrics).*"
+
+discovery:
+  poll_interval: 5s
+  services:
+    - name: payment-service
+      k8s:
+        deployment_name: paymentservice
+        namespace: production
+    - name: order-service
+      k8s:
+        deployment_name: orderservice
+        namespace: production
+
+ebpf:
+  track_request_headers: true
+  http_request_timeout: 30s
+  wake_up_interval: 100ms
+  use_uprobe_multi: true

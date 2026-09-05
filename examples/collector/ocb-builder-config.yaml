@@ -1,0 +1,42 @@
+dist:
+  module: github.com/enterprise/otelcol-custom
+  name: otelcol-custom
+  description: "Enterprise Production OpenTelemetry Collector"
+  output_path: /build/dist
+  version: 1.4.0
+  go: /usr/local/go/bin/go
+  debug_compilation: false
+
+extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.118.0
+  - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.118.0
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.118.0
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.118.0
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.118.0
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.118.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.118.0
+
+connectors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.118.0
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.23.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.23.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.23.0

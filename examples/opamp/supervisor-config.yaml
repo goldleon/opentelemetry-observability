@@ -1,0 +1,19 @@
+server:
+  endpoint: "wss://opamp.monitoring.svc.cluster.local:443/v1/opamp"
+  tls:
+    insecure: false
+    ca_file: "/etc/ssl/certs/opamp-ca.crt"
+  headers:
+    authorization: "Bearer ${OPAMP_AGENT_KEY}"
+
+agent:
+  executable: "/usr/local/bin/otelcol-custom"
+  description: "Kubernetes Node Agent Collector"
+  config_dir: "/etc/otelcol"
+  config_file_name: "effective-config.yaml"
+
+capabilities:
+  reports_status: true
+  accepts_remote_config: true
+  reports_effective_config: true
+  accepts_packages: true
