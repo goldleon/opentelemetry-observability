@@ -44,7 +44,8 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
    - OTel Profiling Data Model (OTEP 0212), on/off-CPU flamegraphs, and symbolication → [Continuous Profiling](references/continuous-profiling.md)
 
 7. **Infrastructure, Backends & Alerting:**
-   - Kubernetes topologies (DaemonSet vs. Gateway vs. Sidecar) and Operator CRDs → [Kubernetes Topologies](references/kubernetes-topologies.md)
+   - Collector deployment patterns (DaemonSet, Gateway, Sidecar, Fargate, Multi-Tier, Signal-Isolated) → [Collector Deployment Patterns](references/collector-deployment-patterns.md)
+   - Kubernetes topologies & OTel Operator CRDs → [Kubernetes Topologies](references/kubernetes-topologies.md)
    - Multi-signal storage backends: ClickHouse, Grafana Mimir, Tempo v2, Loki, VictoriaMetrics → [Storage Backends](references/storage-backends.md)
    - Google SRE Multi-Window Multi-Burn-Rate (MWMBR) SLO alerting → [SLOs & Burn-Rate Alerting](references/slos-and-burn-rate-alerting.md)
 
@@ -138,6 +139,7 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 | **Service Graphs (APM)** | [service-graphs-and-topology.md](references/service-graphs-and-topology.md) | [gateway-tail-sampling-config.yaml](examples/collector/gateway-tail-sampling-config.yaml) |
 | **Sampling & Scaling** | [sampling-and-scaling.md](references/sampling-and-scaling.md) | [agent-daemonset-config.yaml](examples/collector/agent-daemonset-config.yaml) |
 | **Tuning & Sizing** | [performance-and-tuning.md](references/performance-and-tuning.md) | [gateway-statefulset.yaml](examples/kubernetes/gateway-statefulset.yaml) |
+| **Collector Patterns** | [collector-deployment-patterns.md](references/collector-deployment-patterns.md) | [sidecar-pattern.yaml](examples/kubernetes/sidecar-pattern.yaml), [multi-tier-hybrid.yaml](examples/kubernetes/multi-tier-hybrid-topology.yaml), [isolated-gateways.yaml](examples/kubernetes/signal-isolated-gateways.yaml), [fargate.json](examples/kubernetes/serverless-fargate-task.json) |
 | **Kubernetes Topologies** | [kubernetes-topologies.md](references/kubernetes-topologies.md) | [agent-daemonset.yaml](examples/kubernetes/agent-daemonset.yaml), [CRDs](examples/kubernetes/opentelemetry-collector-crd.yaml) |
 | **Storage Backends** | [storage-backends.md](references/storage-backends.md) | [clickhouse.sql](examples/storage/clickhouse-otel-full-schema.sql), [mimir.yaml](examples/storage/mimir-production-config.yaml), [tempo.yaml](examples/storage/tempo-v2-parquet-config.yaml) |
 | **SLO & Burn-Rate Alerts**| [slos-and-burn-rate-alerting.md](references/slos-and-burn-rate-alerting.md) | [slo-mwmbr-rules.yaml](examples/alerting/slo-mwmbr-rules.yaml), [alertmanager.yaml](examples/alerting/alertmanager.yaml) |

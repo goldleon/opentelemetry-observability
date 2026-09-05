@@ -1,0 +1,100 @@
+# ========================================================================
+# Production Multi-Tier Hybrid Topology Manifest
+# Tier 1: DaemonSet Node Agent (Enrichment + Consistent Hash Routing)
+# Tier 2: StatefulSet Gateway (Stateful Tail-Sampling + Persistent Storage)
+# ========================================================================
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: otel-node-agent
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: otel-node-agent
+  template:
+    metadata:
+      labels:
+        app: otel-node-agent
+    spec:
+      serviceAccountName: otel-agent
+      containers:
+        - name: otelcol
+          image: ghcr.io/enterprise/otelcol-custom:1.4.0
+          env:
+            - name: HOST_NAME
+              valueFrom:
+                fieldRef: { fieldPath: spec.nodeName }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          ports:
+            - containerPort: 4317
+              hostPort: 4317
+              name: otlp-grpc
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: otel-gateway-cluster
+  namespace: monitoring
+spec:
+  serviceName: otel-gateway-headless
+  replicas: 4
+  selector:
+    matchLabels:
+      app: otel-gateway-cluster
+  template:
+    metadata:
+      labels:
+        app: otel-gateway-cluster
+    spec:
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels: { app: otel-gateway-cluster }
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: otel-gateway-cluster }
+      containers:
+        - name: otelcol
+          image: ghcr.io/enterprise/otelcol-custom:1.4.0
+          env:
+            - name: GOMEMLIMIT
+              value: "3600MiB"
+          resources:
+            requests: { cpu: 1000m, memory: 2048Mi }
+            limits: { cpu: 4000m, memory: 4096Mi }
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+          volumeMounts:
+            - name: disk-queue
+              mountPath: /var/lib/otelcol/queue
+  volumeClaimTemplates:
+    - metadata:
+        name: disk-queue
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests: { storage: 20Gi }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: otel-gateway-pdb
+  namespace: monitoring
+spec:
+  minAvailable: "75%"
+  selector:
+    matchLabels:
+      app: otel-gateway-cluster

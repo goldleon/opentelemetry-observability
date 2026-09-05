@@ -1,0 +1,45 @@
+{
+  "family": "order-service-fargate",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "containerDefinitions": [
+    {
+      "name": "aws-otel-collector-sidecar",
+      "image": "public.ecr.aws/aws-observability/aws-otel-collector:latest",
+      "essential": true,
+      "command": ["--config=/etc/ecs/ecs-fargate.yaml"],
+      "environment": [
+        { "name": "AWS_REGION", "value": "us-east-1" }
+      ],
+      "portMappings": [
+        { "containerPort": 4317, "protocol": "tcp" },
+        { "containerPort": 4318, "protocol": "tcp" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/otel-collector",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "collector"
+        }
+      }
+    },
+    {
+      "name": "order-service-app",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/order-service:latest",
+      "essential": true,
+      "dependsOn": [
+        { "containerName": "aws-otel-collector-sidecar", "condition": "START" }
+      ],
+      "environment": [
+        { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://localhost:4318" },
+        { "name": "OTEL_SERVICE_NAME", "value": "order-service-fargate" }
+      ],
+      "portMappings": [
+        { "containerPort": 8080, "protocol": "tcp" }
+      ]
+    }
+  ]
+}

@@ -77,6 +77,7 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
 │   ├── service-graphs-and-topology.md      # APM service map generation via servicegraphconnector
 │   ├── sampling-and-scaling.md             # Head vs tail sampling, 2-tier consistent hashing
 │   ├── performance-and-tuning.md           # memory_limiter formulas, GOMEMLIMIT, file_storage queues
+│   ├── collector-deployment-patterns.md    # 6 patterns: DaemonSet, Gateway, Sidecar, Fargate, Multi-Tier, Signal-Isolated
 │   ├── kubernetes-topologies.md            # DaemonSet vs Gateway vs Sidecar, OTel Operator CRDs
 │   ├── storage-backends.md                 # ClickHouse, Grafana Mimir, Tempo v2, Loki, VictoriaMetrics
 │   └── slos-and-burn-rate-alerting.md      # Google SRE Multi-Window Multi-Burn-Rate (MWMBR) alerting
@@ -87,7 +88,7 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
     ├── frontend/                           # Browser RUM with CWV and ZoneContextManager
     ├── mesh/                               # Envoy OTel tracer, Istio Telemetry CRD, Kong plugin
     ├── cicd/                               # GitHub Actions & GitLab CI pipeline tracing configs
-    ├── kubernetes/                         # Production DaemonSet, StatefulSet, and Operator CRDs
+    ├── kubernetes/                         # Production DaemonSet, StatefulSet, Sidecar, Hybrid, Signal-Isolated & Fargate
     ├── storage/                            # ClickHouse multi-signal SQL, Mimir, Tempo, Loki, VictoriaMetrics
     ├── alerting/                           # Prometheus MWMBR SLO rules and Alertmanager routing
     ├── docker/                             # Multi-stage distroless Dockerfile for custom collectors

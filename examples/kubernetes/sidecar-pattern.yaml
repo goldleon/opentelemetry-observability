@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: order-service-with-sidecar
+  namespace: production
+  labels:
+    app: order-service
+spec:
+  # Native Kubernetes 1.28+ sidecar container pattern
+  initContainers:
+    - name: otel-sidecar
+      image: ghcr.io/enterprise/otelcol-custom:1.4.0
+      restartPolicy: Always # Guaranteed to start before and terminate after main container
+      env:
+        - name: GOMEMLIMIT
+          value: "220MiB"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
+      securityContext:
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 65532
+      ports:
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 4318
+          name: otlp-http
+      volumeMounts:
+        - name: sidecar-config
+          mountPath: /etc/otelcol
+        - name: shared-buffer
+          mountPath: /var/lib/otelcol/buffer
+
+  containers:
+    - name: order-service
+      image: registry.internal/order-service:3.2.0
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://127.0.0.1:4318" # Communicates over localhost within the same pod!
+        - name: OTEL_SERVICE_NAME
+          value: "order-service"
+      ports:
+        - containerPort: 8080
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+
+  volumes:
+    - name: sidecar-config
+      configMap:
+        name: otel-sidecar-config
+    - name: shared-buffer
+      emptyDir:
+        medium: Memory
+        sizeLimit: 128Mi

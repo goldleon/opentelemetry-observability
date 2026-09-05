@@ -1,0 +1,81 @@
+# ========================================================================
+# Signal-Isolated Gateway Deployment Pattern
+# Dedicated independent gateways for Traces, Metrics, and Logs
+# Eliminates cross-signal CPU contention and GC pauses
+# ========================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: otel-gateway-traces
+  namespace: monitoring
+spec:
+  serviceName: otel-traces-headless
+  replicas: 4
+  selector:
+    matchLabels:
+      tier: otel-gateway-traces
+  template:
+    metadata:
+      labels:
+        tier: otel-gateway-traces
+    spec:
+      containers:
+        - name: otelcol
+          image: ghcr.io/enterprise/otelcol-custom:1.4.0
+          resources:
+            requests: { cpu: 1000m, memory: 4096Mi } # High RAM for tail_sampling buffer
+            limits: { cpu: 4000m, memory: 8192Mi }
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-gateway-metrics
+  namespace: monitoring
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: otel-gateway-metrics
+  template:
+    metadata:
+      labels:
+        tier: otel-gateway-metrics
+    spec:
+      containers:
+        - name: otelcol
+          image: ghcr.io/enterprise/otelcol-custom:1.4.0
+          resources:
+            requests: { cpu: 2000m, memory: 1024Mi } # High CPU for batch serialization
+            limits: { cpu: 4000m, memory: 2048Mi }
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-gateway-logs
+  namespace: monitoring
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: otel-gateway-logs
+  template:
+    metadata:
+      labels:
+        tier: otel-gateway-logs
+    spec:
+      containers:
+        - name: otelcol
+          image: ghcr.io/enterprise/otelcol-custom:1.4.0
+          resources:
+            requests: { cpu: 1000m, memory: 2048Mi } # Balanced for regex parsing
+            limits: { cpu: 2000m, memory: 4096Mi }
+          ports:
+            - containerPort: 4317
+              name: otlp-grpc
