@@ -1,15 +1,15 @@
 ---
 name: opentelemetry-observability
 description: >-
-  Use when architecting, implementing, or troubleshooting OpenTelemetry (OTel) observability, eBPF telemetry, continuous profiling, OpAMP fleet management, context correlation, custom collectors (OCB), service mesh, RUM, or distributed systems tracing.
+  Use when architecting, implementing, or troubleshooting OpenTelemetry (OTel) observability, eBPF telemetry, continuous profiling, OpAMP fleet management, context correlation, custom collectors (OCB), service mesh, RUM, OTTL transformations, FinOps cardinality control, zero-trust mTLS/PII security, resilient queuing, polyglot application instrumentation, Helm/Terraform IaC, or distributed systems tracing.
 metadata:
   category: architecture
-  triggers: opentelemetry, otel, observability, collector, tracing, metrics, logs, profiles, ebpf, beyla, opamp, w3c-tracecontext, baggage, exemplars, ocb, tail-sampling, rum, service-mesh, envoy, istio, servicegraph, slo, mwmbr, clickhouse, tempo, mimir
+  triggers: opentelemetry, otel, observability, collector, tracing, metrics, logs, profiles, ebpf, beyla, opamp, w3c-tracecontext, baggage, exemplars, ocb, tail-sampling, rum, service-mesh, envoy, istio, servicegraph, slo, mwmbr, clickhouse, tempo, mimir, ottl, finops, cardinality, pii, redaction, mtls, resilience, file_storage, spring-boot, fastapi, dotnet, helm, terraform, telemetrygen
 ---
 
 # OpenTelemetry, eBPF & Distributed Systems Observability
 
-The definitive end-to-end architectural guide and operational toolkit for building cloud-native, production-grade observability platforms using OpenTelemetry (OTel), eBPF, OpAMP, continuous profiling, service mesh, real user monitoring (RUM), and distributed systems design patterns.
+The definitive end-to-end architectural guide and operational toolkit for building cloud-native, production-grade observability platforms using OpenTelemetry (OTel), eBPF, OpAMP, continuous profiling, service mesh, real user monitoring (RUM), OTTL transformations, FinOps cardinality management, zero-trust telemetry security, resilient disk-backed buffering, polyglot application instrumentation, and distributed systems design patterns.
 
 ## ⚡ Quick Decision Tree
 
@@ -34,6 +34,7 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 
 5. **Collector Architecture, Pipelines & Topology:**
    - Pipeline sequencing rules, OTTL transformations, and connectors (`spanmetrics`, `routing`) → [Pipelines & Routing](references/pipelines-and-routing.md)
+   - Complete OTTL grammar, contexts, functions, and error modes → [OTTL Specification & Cookbook](references/ottl-transformation-language.md)
    - Building a minimal, hardened custom collector binary via OCB → [Custom Collectors with OCB](references/custom-collectors-ocb.md)
    - Dynamic APM DAG topology generation from spans via `servicegraphconnector` → [Service Graphs & Topology](references/service-graphs-and-topology.md)
    - Sizing formulas, memory limiter, GOMEMLIMIT, and persistent queues (`file_storage`) → [Performance & Tuning](references/performance-and-tuning.md)
@@ -43,11 +44,20 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
    - Zero-code kernel instrumentation (kprobes, fentry, uprobes for TLS, Beyla, CO-RE) → [eBPF Observability](references/ebpf-observability.md)
    - OTel Profiling Data Model (OTEP 0212), on/off-CPU flamegraphs, and symbolication → [Continuous Profiling](references/continuous-profiling.md)
 
-7. **Infrastructure, Backends & Alerting:**
+7. **Deployment Patterns & Infrastructure:**
    - Collector deployment patterns (DaemonSet, Gateway, Sidecar, Fargate, Multi-Tier, Signal-Isolated) → [Collector Deployment Patterns](references/collector-deployment-patterns.md)
    - Kubernetes topologies & OTel Operator CRDs → [Kubernetes Topologies](references/kubernetes-topologies.md)
+   - Infrastructure as Code with Helm, Terraform, and GitOps → [Infrastructure as Code](references/infrastructure-as-code.md)
+
+8. **FinOps, Security, Governance & Storage:**
+   - Metric cardinality management, label stripping, and synthetic probe filtering → [FinOps & Cardinality Control](references/cardinality-and-cost-optimization.md)
+   - Zero-trust mTLS, regex PII redaction, and multi-tenant isolation → [Security, PII & Multi-Tenancy](references/security-compliance-and-pii.md)
+   - Resilient persistent queues (`file_storage`), memory limiter rules, and backpressure → [Resilience & Backpressure](references/resilience-and-backpressure.md)
    - Multi-signal storage backends: ClickHouse, Grafana Mimir, Tempo v2, Loki, VictoriaMetrics → [Storage Backends](references/storage-backends.md)
    - Google SRE Multi-Window Multi-Burn-Rate (MWMBR) SLO alerting → [SLOs & Burn-Rate Alerting](references/slos-and-burn-rate-alerting.md)
+
+9. **Polyglot Production Application Instrumentation:**
+   - Spring Boot 3 Virtual Threads, Python FastAPI AsyncIO, Node.js Express/Next.js, .NET 8 Activity API → [Polyglot Application Instrumentation](references/polyglot-application-instrumentation.md)
 
 ---
 
@@ -72,16 +82,17 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 │   • Generates Ingress Gateway Server Span (SPAN_KIND_SERVER)                                │
 │   • Downstream Envoy Sidecars / Istio Service Mesh inject client/server span pairs          │
 └───────────────────────────────────────┬─────────────────────────────────────────────────────┘
-                                        │ OTLP (gRPC :4317 / HTTP :4318)
+                                        │ OTLP (mTLS gRPC :4317 / HTTP :4318)
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │ 3. OPENTELEMETRY COLLECTOR PIPELINE                                                         │
 │                                                                                             │
 │  Receivers: otlp (grpc/http), filelog, hostmetrics                                          │
-│  Processors: memory_limiter, batch, transform (sanitize PII), tail_sampling                │
+│  Processors: memory_limiter, redaction (PII), transform (OTTL), filter, batch               │
 │  Connectors:                                                                                │
 │   ├── servicegraphconnector  ──> DAG Service Map Metrics (request_total, duration)          │
 │   └── spanmetricsconnector   ──> RED & SLO Metrics (calls_total, latency buckets)           │
+│  Extensions: file_storage (disk-backed persistent queue for downstream resilience)          │
 └───────────────────────┬───────────────────────────────────────────┬─────────────────────────┘
                         │ Metrics (PromQL)                          │ Traces (OTLP)
                         ▼                                           ▼
@@ -103,7 +114,7 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
    - **Rule**: `memory_limiter` **MUST** be the first processor in every pipeline. `batch` **MUST** be the last processor immediately preceding exporters.
 2. **Baggage Cardinality Leaks**:
    - **Anti-pattern**: Automatically copying all W3C Baggage entries onto span attributes or Prometheus metrics.
-   - **Rule**: Never expose raw baggage globally. Implement a strict whitelist (`SelectiveBaggageSpanProcessor`) to prevent metrics TSDB cardinality explosions.
+   - **Rule**: Never expose raw baggage globally. Implement a strict whitelist (`SelectiveBaggageSpanProcessor`) or OTTL delete rules to prevent metrics TSDB cardinality explosions.
 3. **Trace Breaking at the API Gateway**:
    - **Anti-pattern**: Configuring an API gateway (Kong, Envoy, NGINX) to unconditionally overwrite `trace_id`.
    - **Rule**: Gateways must preserve and validate incoming W3C `traceparent` headers to keep frontend user interactions connected with backend microservices.
@@ -116,6 +127,9 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 6. **Layer 4 gRPC Load Balancing Bottleneck**:
    - **Anti-pattern**: Routing high-volume gRPC OTLP traffic through standard Kubernetes ClusterIP services.
    - **Rule**: gRPC multiplexes traffic over persistent HTTP/2 TCP streams, causing extreme load hotspotting on a single collector pod. Always use Layer 7 load balancing (Envoy) or enforce `max_connection_age: 120s` on collector gRPC receivers.
+7. **Unbounded In-Memory Exporter Queuing**:
+   - **Anti-pattern**: Relying solely on default in-memory exporter queues when downstream backends experience outages.
+   - **Rule**: Configure the `file_storage` extension to back the `sending_queue` with persistent SSD storage, preventing OOM crashes and telemetry loss during network partitions.
 
 ---
 
@@ -135,14 +149,21 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 | **eBPF Instrumentation** | [ebpf-observability.md](references/ebpf-observability.md) | [beyla-config.yaml](examples/ebpf/beyla-config.yaml), [beyla-daemonset.yaml](examples/ebpf/beyla-daemonset.yaml) |
 | **Continuous Profiling** | [continuous-profiling.md](references/continuous-profiling.md) | [span-guided-profiling.go](examples/code/span-guided-profiling.go) |
 | **Custom Collectors (OCB)**| [custom-collectors-ocb.md](references/custom-collectors-ocb.md) | [ocb-builder-config.yaml](examples/collector/ocb-builder-config.yaml), [Dockerfile](examples/docker/Dockerfile.distroless) |
-| **Pipelines & OTTL** | [pipelines-and-routing.md](references/pipelines-and-routing.md) | [gateway-tail-sampling-config.yaml](examples/collector/gateway-tail-sampling-config.yaml) |
+| **Pipelines & Routing** | [pipelines-and-routing.md](references/pipelines-and-routing.md) | [gateway-tail-sampling-config.yaml](examples/collector/gateway-tail-sampling-config.yaml) |
+| **OTTL Cookbook** | [ottl-transformation-language.md](references/ottl-transformation-language.md) | [ottl-transformation-cookbook.yaml](examples/collector/ottl-transformation-cookbook.yaml) |
+| **FinOps & Cardinality** | [cardinality-and-cost-optimization.md](references/cardinality-and-cost-optimization.md) | [finops-cardinality-control.yaml](examples/collector/finops-cardinality-control.yaml) |
+| **Security & PII Masking**| [security-compliance-and-pii.md](references/security-compliance-and-pii.md) | [security-pii-masking-mtls.yaml](examples/collector/security-pii-masking-mtls.yaml) |
+| **Resilience & Backpressure**| [resilience-and-backpressure.md](references/resilience-and-backpressure.md) | [resilience-persistent-queue.yaml](examples/collector/resilience-persistent-queue.yaml) |
 | **Service Graphs (APM)** | [service-graphs-and-topology.md](references/service-graphs-and-topology.md) | [gateway-tail-sampling-config.yaml](examples/collector/gateway-tail-sampling-config.yaml) |
 | **Sampling & Scaling** | [sampling-and-scaling.md](references/sampling-and-scaling.md) | [agent-daemonset-config.yaml](examples/collector/agent-daemonset-config.yaml) |
 | **Tuning & Sizing** | [performance-and-tuning.md](references/performance-and-tuning.md) | [gateway-statefulset.yaml](examples/kubernetes/gateway-statefulset.yaml) |
-| **Collector Patterns** | [collector-deployment-patterns.md](references/collector-deployment-patterns.md) | [sidecar-pattern.yaml](examples/kubernetes/sidecar-pattern.yaml), [multi-tier-hybrid.yaml](examples/kubernetes/multi-tier-hybrid-topology.yaml), [isolated-gateways.yaml](examples/kubernetes/signal-isolated-gateways.yaml), [fargate.json](examples/kubernetes/serverless-fargate-task.json) |
+| **Collector Patterns** | [collector-deployment-patterns.md](references/collector-deployment-patterns.md) | [sidecar-pattern.yaml](examples/kubernetes/sidecar-pattern.yaml), [multi-tier-hybrid.yaml](examples/kubernetes/multi-tier-hybrid-topology.yaml) |
 | **Kubernetes Topologies** | [kubernetes-topologies.md](references/kubernetes-topologies.md) | [agent-daemonset.yaml](examples/kubernetes/agent-daemonset.yaml), [CRDs](examples/kubernetes/opentelemetry-collector-crd.yaml) |
-| **Storage Backends** | [storage-backends.md](references/storage-backends.md) | [clickhouse.sql](examples/storage/clickhouse-otel-full-schema.sql), [mimir.yaml](examples/storage/mimir-production-config.yaml), [tempo.yaml](examples/storage/tempo-v2-parquet-config.yaml) |
+| **Infrastructure as Code**| [infrastructure-as-code.md](references/infrastructure-as-code.md) | [Helm Chart](examples/helm/opentelemetry-stack/), [Terraform](examples/terraform/main.tf) |
+| **Storage Backends** | [storage-backends.md](references/storage-backends.md) | [clickhouse.sql](examples/storage/clickhouse-otel-full-schema.sql), [mimir.yaml](examples/storage/mimir-production-config.yaml) |
 | **SLO & Burn-Rate Alerts**| [slos-and-burn-rate-alerting.md](references/slos-and-burn-rate-alerting.md) | [slo-mwmbr-rules.yaml](examples/alerting/slo-mwmbr-rules.yaml), [alertmanager.yaml](examples/alerting/alertmanager.yaml) |
+| **Polyglot Apps** | [polyglot-application-instrumentation.md](references/polyglot-application-instrumentation.md) | [Java](examples/code/java-spring-boot-otel.java), [Python](examples/code/python-fastapi-otel.py), [Node](examples/code/node-express-otel.ts), [C#](examples/code/dotnet-aspnet-otel.cs) |
+| **Collector Benchmarking**| [resilience-and-backpressure.md](references/resilience-and-backpressure.md) | [benchmark-collector.sh](examples/benchmarking/benchmark-collector.sh) |
 
 ---
 
@@ -151,9 +172,12 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 - [ ] All collector pipelines have `memory_limiter` configured as the first processor.
 - [ ] Ingress gateways and CORS preflight explicitly allow `traceparent`, `tracestate`, and `baggage`.
 - [ ] Browser RUM initializes `ZoneContextManager` to prevent async context drop.
-- [ ] Container `resources.limits.memory` has `GOMEMLIMIT` set to ~90% of the limit.
-- [ ] Exporters connecting to remote backends have `sending_queue` backed by `file_storage`.
+- [ ] Container `resources.limits.memory` has `GOMEMLIMIT` set to ~85% of the limit.
+- [ ] Exporters connecting to remote backends have `sending_queue` backed by `file_storage` persistent disk buffer.
 - [ ] Tail-sampling gateway pods receive cohesive traces via Tier 1 `loadbalancingexporter` on `trace_id`.
+- [ ] High-cardinality attributes (`user.id`, `ip`, unique query params) are stripped from metrics using OTTL.
+- [ ] PII and authentication credentials (Bearer tokens, credit cards, SSNs) are sanitized via `redactionprocessor`.
+- [ ] Mutual TLS (mTLS) with client certificate verification is enforced between node agents and gateway pools.
 - [ ] Service Graph connector is wired between traces pipeline and metrics pipeline for DAG topology.
 - [ ] Ingress gRPC receivers enforce `max_connection_age` or run behind an L7 Envoy proxy.
 - [ ] Kernel eBPF auto-instrumentation drops unneeded privileges and retains only `CAP_BPF`, `CAP_PERFMON`, and `CAP_NET_ADMIN`.

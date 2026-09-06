@@ -1,0 +1,78 @@
+# OpenTelemetry Collector - Resilience & Disk-Backed Persistent Queue
+# Uses file_storage extension to survive downstream storage outages without data loss
+
+extensions:
+  file_storage/disk_queue:
+    directory: /var/lib/otelcol/queue
+    timeout: 10s
+    compaction:
+      on_start: true
+      directory: /var/lib/otelcol/queue/compacted
+    max_total_storage_size_mib: 20480 # 20 GB disk queue buffer
+
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Memory limiter must be first processor
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  batch:
+    send_batch_size: 16384
+    timeout: 2s
+
+exporters:
+  otlp/resilient_tempo:
+    endpoint: tempo-distributor.monitoring.svc:4317
+    tls:
+      insecure: true
+    # Persistent disk-backed queue to survive backend downtime
+    sending_queue:
+      enabled: true
+      storage: file_storage/disk_queue
+      queue_size: 100000
+      num_consumers: 32
+    # Exponential backoff retry policy
+    retry_on_failure:
+      enabled: true
+      initial_interval: 2s
+      max_interval: 120s
+      max_elapsed_time: 60m
+
+  otlp/resilient_mimir:
+    endpoint: mimir-distributor.monitoring.svc:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      storage: file_storage/disk_queue
+      queue_size: 100000
+      num_consumers: 32
+    retry_on_failure:
+      enabled: true
+      initial_interval: 2s
+      max_interval: 120s
+      max_elapsed_time: 60m
+
+service:
+  extensions: [file_storage/disk_queue, health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/resilient_tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/resilient_mimir]

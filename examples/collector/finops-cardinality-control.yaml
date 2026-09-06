@@ -1,0 +1,86 @@
+# OpenTelemetry Collector - FinOps, Cardinality Control & Noise Suppression
+# Drops synthetic probes, strips high-cardinality labels, and manages telemetry ingestion costs
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # 1. Filter out Kubernetes kubelet health probes and Prometheus scrape noise
+  filter/drop_synthetic_traffic:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["http.target"] == "/healthz"'
+        - 'attributes["http.target"] == "/readyz"'
+        - 'attributes["http.target"] == "/livez"'
+        - 'attributes["http.target"] == "/metrics"'
+        - 'IsMatch(attributes["http.user_agent"], ".*kube-probe.*")'
+    logs:
+      log_record:
+        - 'IsMatch(body, ".*GET /(healthz|readyz|livez|metrics).*200.*")'
+        - 'IsMatch(attributes["http.user_agent"], ".*kube-probe.*")'
+
+  # 2. Strip high-cardinality attributes from metrics
+  transform/strip_dimensions:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - delete_key(datapoint.attributes, "user_id")
+          - delete_key(datapoint.attributes, "session_id")
+          - delete_key(datapoint.attributes, "request_id")
+          - delete_key(datapoint.attributes, "client_ip")
+
+  # 3. Truncate bloated log attributes and bodies to cap byte egress
+  transform/truncate_payloads:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - truncate_all(log.attributes, 512)
+
+  # 4. Batch processor for optimized network transport
+  batch:
+    send_batch_size: 16384
+    timeout: 2s
+
+exporters:
+  otlp/mimir:
+    endpoint: mimir-distributor.monitoring.svc:4317
+    tls:
+      insecure: true
+
+  otlp/loki:
+    endpoint: loki-gateway.monitoring.svc:4317
+    tls:
+      insecure: true
+
+  otlp/tempo:
+    endpoint: tempo-distributor.monitoring.svc:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/drop_synthetic_traffic, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/strip_dimensions, batch]
+      exporters: [otlp/mimir]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/drop_synthetic_traffic, transform/truncate_payloads, batch]
+      exporters: [otlp/loki]

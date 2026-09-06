@@ -1,0 +1,14 @@
+apiVersion: v2
+name: opentelemetry-stack
+description: Production OpenTelemetry Observability Stack (Operator, Gateway Cluster, and Agent DaemonSet)
+type: application
+version: 1.0.0
+appVersion: "0.96.0"
+keywords:
+  - opentelemetry
+  - observability
+  - tracing
+  - metrics
+  - logs
+maintainers:
+  - name: Platform Engineering

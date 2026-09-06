@@ -1,0 +1,89 @@
+# OpenTelemetry Collector - Production OTTL Transformation Cookbook
+# Demonstrates OTTL transformations across Spans, Metrics, and Logs
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # 1. Transform Spans: Normalize route, rewrite errors, extract baggage
+  transform/traces:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          # Normalize span name if http.route is present
+          - set(span.name, Concat([span.attributes["http.method"], " ", span.attributes["http.route"]], "")) where span.attributes["http.route"] != nil
+          # Set span status to ERROR on HTTP 5xx responses
+          - set(span.status.code, 2) where span.attributes["http.status_code"] >= 500
+          - set(span.status.description, "Server Internal Error") where span.attributes["http.status_code"] >= 500
+          # Hoist tenant_id from baggage to top-level span attribute
+          - set(span.attributes["tenant.id"], span.attributes["baggage.tenant_id"]) where span.attributes["baggage.tenant_id"] != nil
+          # Strip query parameters containing sensitive tokens
+          - replace_pattern(span.attributes["http.url"], "token=[^&]+", "token=[REDACTED]")
+
+  # 2. Transform Metrics: Strip high-cardinality attributes & normalize endpoints
+  transform/metrics:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          # Drop unique user identifiers from time-series datapoints
+          - delete_key(datapoint.attributes, "user.id")
+          - delete_key(datapoint.attributes, "account.id")
+          - delete_key(datapoint.attributes, "ip")
+          # Normalize numeric IDs in HTTP targets to :id to cap series growth
+          - replace_pattern(datapoint.attributes["http.target"], "/[0-9a-fA-F-]{36}", "/:id")
+          - replace_pattern(datapoint.attributes["http.target"], "/[0-9]{4,}", "/:id")
+
+  # 3. Transform Logs: Redact PII (Emails, Credit Cards) and parse JSON bodies
+  transform/logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Mask Email Addresses
+          - replace_all_patterns(log.body, "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "[REDACTED_EMAIL]")
+          # Mask 16-digit Credit Card Numbers
+          - replace_all_patterns(log.body, "\\b(?:\\d[ -]*?){13,16}\\b", "[REDACTED_CC]")
+          # Delete credentials from attributes
+          - delete_matching_keys(log.attributes, "(?i)(password|secret|token|authorization|api_key)")
+          # Parse JSON logs into structured attributes
+          - merge_maps(log.attributes, ParseJSON(log.body), "upsert") where IsMatch(log.body, "^\\{.*\\}$")
+          - set(log.severity_text, log.attributes["level"]) where log.attributes["level"] != nil
+
+  batch:
+    send_batch_size: 8192
+    timeout: 5s
+
+exporters:
+  debug:
+    verbosity: detailed
+  otlp:
+    endpoint: tempo.storage.svc:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/traces, batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/metrics, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/logs, batch]
+      exporters: [debug]

@@ -4,7 +4,7 @@
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-v1.30+-orange.svg)](https://opentelemetry.io)
 [![eBPF](https://img.shields.io/badge/eBPF-Linux_5.8+-green.svg)](https://ebpf.io)
 
-An enterprise-grade, authoritative knowledge repository, architecture guide, and operational skill for Antigravity and AI coding agents. This repository covers the complete, end-to-end OpenTelemetry ecosystem: Traces, Metrics, Logs, Profiles, OpAMP fleet management, eBPF auto-instrumentation, continuous profiling, distributed systems causality, frontend RUM (Core Web Vitals), ingress & service mesh, CI/CD pipeline tracing, APM service graphs, high-cardinality storage, and Google SRE multi-burn-rate alerting.
+An enterprise-grade, authoritative knowledge repository, architecture guide, and operational skill for Antigravity and AI coding agents. This repository covers the complete, end-to-end OpenTelemetry ecosystem: Traces, Metrics, Logs, Profiles, OpAMP fleet management, eBPF auto-instrumentation, continuous profiling, distributed systems causality, frontend RUM (Core Web Vitals), ingress & service mesh, CI/CD pipeline tracing, APM service graphs, OTTL transformation recipes, FinOps cardinality control, zero-trust mTLS security, resilient disk-backed buffering, polyglot application instrumentation, Helm & Terraform IaC, high-cardinality storage, and Google SRE multi-burn-rate alerting.
 
 ---
 
@@ -29,16 +29,17 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
 │   • Generates Ingress Gateway Server Span (SPAN_KIND_SERVER)                                │
 │   • Downstream Envoy Sidecars / Istio Service Mesh inject client/server span pairs          │
 └───────────────────────────────────────┬─────────────────────────────────────────────────────┘
-                                        │ OTLP (gRPC :4317 / HTTP :4318)
+                                        │ OTLP (mTLS gRPC :4317 / HTTP :4318)
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │ 3. OPENTELEMETRY COLLECTOR PIPELINE                                                         │
 │                                                                                             │
 │  Receivers: otlp (grpc/http), filelog, hostmetrics                                          │
-│  Processors: memory_limiter, batch, transform (sanitize PII), tail_sampling                │
+│  Processors: memory_limiter, redaction (PII), transform (OTTL), filter, batch               │
 │  Connectors:                                                                                │
 │   ├── servicegraphconnector  ──> DAG Service Map Metrics (request_total, duration)          │
 │   └── spanmetricsconnector   ──> RED & SLO Metrics (calls_total, latency buckets)           │
+│  Extensions: file_storage (disk-backed persistent queue for downstream resilience)          │
 └───────────────────────┬───────────────────────────────────────────┬─────────────────────────┘
                         │ Metrics (PromQL)                          │ Traces (OTLP)
                         ▼                                           ▼
@@ -60,7 +61,7 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
 ├── SKILL.md                                # Master skill manifest with trigger conditions & anti-patterns
 ├── README.md                               # Project documentation and architectural overview
 ├── LICENSE                                 # Apache 2.0 License
-├── references/                             # Detailed technical specifications and guides (19 files)
+├── references/                             # Detailed technical specifications and guides (26 files)
 │   ├── core-concepts-and-signals.md        # The 4 signals: Traces, Metrics, Logs, Profiles
 │   ├── otel-specification.md               # API vs SDK, in-memory buffering, batching, and samplers
 │   ├── semantic-conventions-and-schemas.md # SemConv (HTTP, DB, RPC, Messaging, GenAI/LLM) & Schema URLs
@@ -74,15 +75,21 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
 │   ├── distributed-causality.md            # Span Links vs Parent Spans, Kafka, clock skew, failure modes
 │   ├── custom-collectors-ocb.md            # OpenTelemetry Collector Builder (OCB), distroless builds
 │   ├── pipelines-and-routing.md            # Pipeline rules, OTTL syntax, spanmetrics & routing connectors
+│   ├── ottl-transformation-language.md     # OTTL specification, contexts, function index, and recipes
+│   ├── cardinality-and-cost-optimization.md# Metric cardinality stripping, FinOps, probe suppression
+│   ├── security-compliance-and-pii.md      # Zero-trust mTLS, redactionprocessor, multi-tenancy routing
+│   ├── resilience-and-backpressure.md      # file_storage persistent queues, memory_limiter formulas
 │   ├── service-graphs-and-topology.md      # APM service map generation via servicegraphconnector
 │   ├── sampling-and-scaling.md             # Head vs tail sampling, 2-tier consistent hashing
 │   ├── performance-and-tuning.md           # memory_limiter formulas, GOMEMLIMIT, file_storage queues
 │   ├── collector-deployment-patterns.md    # 6 patterns: DaemonSet, Gateway, Sidecar, Fargate, Multi-Tier, Signal-Isolated
 │   ├── kubernetes-topologies.md            # DaemonSet vs Gateway vs Sidecar, OTel Operator CRDs
+│   ├── infrastructure-as-code.md           # GitOps, Helm, Terraform, and config validation pipelines
 │   ├── storage-backends.md                 # ClickHouse, Grafana Mimir, Tempo v2, Loki, VictoriaMetrics
-│   └── slos-and-burn-rate-alerting.md      # Google SRE Multi-Window Multi-Burn-Rate (MWMBR) alerting
+│   ├── slos-and-burn-rate-alerting.md      # Google SRE Multi-Window Multi-Burn-Rate (MWMBR) alerting
+│   └── polyglot-application-instrumentation.md # Java Spring Boot, Python FastAPI, Node.js, .NET patterns
 └── examples/                               # Production-ready configuration and code snippets
-    ├── collector/                          # Agent, Gateway, and OCB builder configurations
+    ├── collector/                          # Agent, Gateway, OTTL cookbook, FinOps, mTLS, and OCB configs
     ├── opamp/                              # OpAMP Supervisor and Collector Extension configs
     ├── ebpf/                               # Beyla config and hardened Kubernetes DaemonSet
     ├── frontend/                           # Browser RUM with CWV and ZoneContextManager
@@ -92,7 +99,10 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
     ├── storage/                            # ClickHouse multi-signal SQL, Mimir, Tempo, Loki, VictoriaMetrics
     ├── alerting/                           # Prometheus MWMBR SLO rules and Alertmanager routing
     ├── docker/                             # Multi-stage distroless Dockerfile for custom collectors
-    └── code/                               # Go, Kafka, Prometheus, Profiling, and GenAI examples
+    ├── code/                               # Polyglot apps (Java, Python, Node, .NET, Go, Kafka, GenAI)
+    ├── helm/                               # Production Helm chart (opentelemetry-stack)
+    ├── terraform/                          # Terraform module for OpenTelemetry Operator
+    └── benchmarking/                       # telemetrygen load testing and benchmarking script
 ```
 
 ---
@@ -102,10 +112,7 @@ An enterprise-grade, authoritative knowledge repository, architecture guide, and
 To register this skill in your local Antigravity environment:
 
 ```bash
-# Option 1: Symlink into Antigravity skills directory
-ln -s "$(pwd)" ~/.gemini/config/skills/opentelemetry-observability
-
-# Option 2: Copy directly
+# Direct Copy
 mkdir -p ~/.gemini/config/skills/opentelemetry-observability
 cp -R * ~/.gemini/config/skills/opentelemetry-observability/
 ```
