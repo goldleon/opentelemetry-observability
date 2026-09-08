@@ -72,6 +72,9 @@ spec:
 
 ### 2.2 `Instrumentation` CRD (Zero-Code Injection)
 Injects Java, Node.js, Python, or Go auto-instrumentation agents directly into pods via annotations (`instrumentation.opentelemetry.io/inject-java: "true"`):
+
+> ⚠️ Verify current version: the four auto-instrumentation image tags below release independently. Check https://github.com/open-telemetry/opentelemetry-operator/releases for the current tags before applying this CR.
+
 ```yaml
 apiVersion: opentelemetry.io/v1alpha1
 kind: Instrumentation
