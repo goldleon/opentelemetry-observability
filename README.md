@@ -119,6 +119,22 @@ cp -R * ~/.gemini/config/skills/opentelemetry-observability/
 
 ---
 
+## 🚀 Installation into Claude Code
+
+`SKILL.md`'s YAML frontmatter format is shared across Claude Code and Antigravity, so the same contents drop in unchanged — only the destination directory differs.
+
+```bash
+# Project-level (this repo's skill available only inside one project)
+mkdir -p .claude/skills/opentelemetry-observability
+cp -R * .claude/skills/opentelemetry-observability/
+
+# User-level (skill available across all your projects)
+mkdir -p ~/.claude/skills/opentelemetry-observability
+cp -R * ~/.claude/skills/opentelemetry-observability/
+```
+
+---
+
 ## 📄 License
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
