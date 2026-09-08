@@ -13,6 +13,8 @@ Spring Boot 3.2+ introduces Java 21 Virtual Threads (`Project Loom`). Traditiona
 - Context automatically flows across virtual threads when using OpenTelemetry Javaagent 2.x+.
 - Correlate SLF4J / Logback with OpenTelemetry MDC using `OpenTelemetryAppender`.
 
+> ⚠️ Verify current version: `1.36.0` below is the OTel Java SDK/API version at time of writing. Check https://github.com/open-telemetry/opentelemetry-java/releases for the current release before pinning it in a real `pom.xml`.
+
 ```xml
 <!-- pom.xml snippet -->
 <dependency>

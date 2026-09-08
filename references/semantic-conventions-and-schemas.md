@@ -34,6 +34,8 @@ Semantic Conventions (SemConv) define standardized attribute keys, metric names,
 
 ## 2. HTTP Semantic Conventions (v1.26+ Modern vs. Legacy)
 
+> ⚠️ Verify current version: semantic convention stability levels and version thresholds advance with every OTel release. Confirm the current status at https://opentelemetry.io/docs/specs/semconv/http/ before citing "v1.26+" as current in a design doc.
+
 The OpenTelemetry project migrated HTTP conventions from legacy syntax to clean, unambiguous namespaces.
 
 | Attribute Purpose | Legacy Syntax (Deprecated) | Modern Stable Syntax (v1.26+) | Example Value |
@@ -96,6 +98,9 @@ As generative AI and agentic systems became mainstream, OpenTelemetry introduced
 As semantic conventions evolve, attribute keys change. The **Schema URL** mechanism prevents breaking downstream dashboards when microservices upgrade SDK versions at different times.
 
 ### 5.1 How Schema Translation Works
+
+> ⚠️ Verify current version: `1.26.0` below is illustrative, not necessarily the latest schema. Check https://opentelemetry.io/schemas/ for the current version before pinning a schema URL in a production SDK config.
+
 Every Resource and Scope emitted by an SDK declares its Schema URL:
 ```json
 {

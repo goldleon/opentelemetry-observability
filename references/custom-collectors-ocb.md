@@ -26,6 +26,8 @@ The **OpenTelemetry Collector Builder (`ocb`)** compiles tailored collector bina
 
 ## 2. The `builder-config.yaml` Specification
 
+> ⚠️ Verify current version: every `gomod` line below (and `OCB_VERSION` further down) is pinned to a specific Collector/contrib release. These modules release on their own cadence — check https://github.com/open-telemetry/opentelemetry-collector-releases/releases and https://github.com/open-telemetry/opentelemetry-collector-contrib/releases for current versions before using this manifest as-is.
+
 ```yaml
 dist:
   module: github.com/enterprise/otelcol-custom

@@ -61,6 +61,12 @@ The definitive end-to-end architectural guide and operational toolkit for buildi
 
 ---
 
+## 🔍 Verify Before You Commit
+
+This repo is a knowledge base, not a live feed. Component versions, dependency pins, and semantic-convention stability levels advance with every OTel release — the specific numbers below are current as of when each file was last updated, not guaranteed current now. Wherever a reference file carries a `> ⚠️ Verify current version` callout above a config block or table, check the linked upstream source before putting that number into a real design doc, IaC template, or dependency manifest. Cite what you verified and when, rather than presenting this repo's numbers as settled fact.
+
+---
+
 ## 🏛️ End-to-End Enterprise Architecture
 
 ```
